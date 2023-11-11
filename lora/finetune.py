@@ -188,13 +188,13 @@ def train(
     model = get_peft_model(model, config)
 
     if train_set_path.endswith(".json") or train_set_path.endswith(".jsonl"):
-        train = load_dataset("json", data_files=data_path)
-        dev = load_dataset("json", data_files=data_path)
-        test = load_dataset("json", data_files=data_path)
+        train = load_dataset("json", data_files=train_set_path)
+        dev = load_dataset("json", data_files=dev_set_path)
+        test = load_dataset("json", data_files=test_set_path)
     else:
-        train = load_dataset(data_path)
-        dev = load_dataset(data_path)
-        test = load_dataset(data_path)
+        train = load_dataset(train_set_path)
+        dev = load_dataset(dev_set_path)
+        test = load_dataset(test_set_path)
 
     if resume_from_checkpoint:
         # Check the available weights and load them
