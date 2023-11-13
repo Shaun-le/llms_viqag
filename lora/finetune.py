@@ -154,6 +154,7 @@ def train(
         )
 
         result["labels"] = label['input_ids']
+        result["input_ids"] = result["input_ids"]
         #result["labels"] = result["input_ids"].copy()
 
         return result
@@ -229,13 +230,13 @@ def train(
 
     if val_set_size > 0:
         train_data = (
-            train["train"].shuffle().map(generate_and_tokenize_prompt)#, remove_columns=['instruction','input','output'])
+            train["train"].shuffle().map(generate_and_tokenize_prompt, remove_columns=['instruction','input','output'])
         )
         val_data = (
-            dev["train"].shuffle().map(generate_and_tokenize_prompt)#, remove_columns=['instruction','input','output'])
+            dev["train"].shuffle().map(generate_and_tokenize_prompt, remove_columns=['instruction','input','output'])
         )
         test_data = (
-            test["train"].shuffle().map(generate_and_tokenize_prompt)#, remove_columns=['instruction','input','output'])
+            test["train"].shuffle().map(generate_and_tokenize_prompt, remove_columns=['instruction','input','output'])
         )
     else:
         train_data = train["train"].shuffle().map(generate_and_tokenize_prompt)
