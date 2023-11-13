@@ -145,7 +145,16 @@ def train(
             result["input_ids"].append(tokenizer.eos_token_id)
             result["attention_mask"].append(1)
 
-        result["labels"] = result["input_ids"].copy()
+        label = tokenizer(
+            prompter.get_response(prompt),
+            truncation=True,
+            max_length=cutoff_len,
+            padding=True,
+            return_tensors=None,
+        )
+
+        result["labels"] = label['input_ids']
+        #result["labels"] = result["input_ids"].copy()
 
         return result
 
@@ -220,13 +229,13 @@ def train(
 
     if val_set_size > 0:
         train_data = (
-            train["train"].shuffle().map(generate_and_tokenize_prompt)
+            train["train"].shuffle().map(generate_and_tokenize_prompt, remove_columns = ['intruction', 'input', 'output'])
         )
         val_data = (
-            dev["train"].shuffle().map(generate_and_tokenize_prompt)
+            dev["train"].shuffle().map(generate_and_tokenize_prompt, remove_columns = ['intruction', 'input', 'output'])
         )
         test_data = (
-            test["train"].shuffle().map(generate_and_tokenize_prompt)
+            test["train"].shuffle().map(generate_and_tokenize_prompt, remove_columns = ['intruction', 'input', 'output'])
         )
     else:
         train_data = train["train"].shuffle().map(generate_and_tokenize_prompt)
