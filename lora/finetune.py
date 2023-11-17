@@ -27,10 +27,10 @@ from utils.prompter import Prompter
 
 def train(
     # model/data params
-    base_model: str = "",  # the only required argument
-    train_set_path: str = "yahma/alpaca-cleaned",
-    dev_set_path: str = "yahma/alpaca-cleaned",
-    test_set_path: str = "yahma/alpaca-cleaned",
+    base_model: str = "",
+    trainset_path: str = "yahma/alpaca-cleaned",
+    devset_path: str = "yahma/alpaca-cleaned",
+    testset_path: str = "yahma/alpaca-cleaned",
     output_dir: str = "./lora-alpaca",
     # training hyperparams
     batch_size: int = 128,
@@ -63,9 +63,7 @@ def train(
         print(
             f"Training Alpaca-LoRA model with params:\n"
             f"base_model: {base_model}\n"
-            f"train_set_path: {train_set_path}\n"
-            f"dev_set_path: {dev_set_path}\n"
-            f"test_set_path: {test_set_path}\n"
+            f"data_path: {data_path}\n"
             f"output_dir: {output_dir}\n"
             f"batch_size: {batch_size}\n"
             f"micro_batch_size: {micro_batch_size}\n"
@@ -146,6 +144,7 @@ def train(
             result["attention_mask"].append(1)
 
         result["labels"] = result["input_ids"].copy()
+
         return result
 
     def generate_and_tokenize_prompt(data_point):
@@ -186,14 +185,14 @@ def train(
     )
     model = get_peft_model(model, config)
 
-    if train_set_path.endswith(".json") or train_set_path.endswith(".jsonl"):
-        train = load_dataset("json", data_files=train_set_path)
-        dev = load_dataset("json", data_files=dev_set_path)
-        test = load_dataset("json", data_files=test_set_path)
+    if trainset_path.endswith(".json") or trainset_path.endswith(".jsonl"):
+        train = load_dataset("json", data_files=trainset_path)
+        dev = load_dataset("json", data_files=devset_path)
+        test = load_dataset("json", data_files=testset_path)
     else:
-        train = load_dataset(train_set_path)
-        dev = load_dataset(dev_set_path)
-        test = load_dataset(test_set_path)
+        train = load_dataset(data_path)
+        dev = load_dataset(data_path)
+        test = load_dataset(data_path)
 
     if resume_from_checkpoint:
         # Check the available weights and load them
@@ -219,18 +218,14 @@ def train(
 
     if val_set_size > 0:
         train_data = (
-            train["train"].shuffle().map(generate_and_tokenize_prompt, remove_columns=['instruction','input','output'])
+            train["train"].shuffle().map(generate_and_tokenize_prompt)
         )
         val_data = (
-            dev["train"].shuffle().map(generate_and_tokenize_prompt, remove_columns=['instruction','input','output'])
-        )
-        test_data = (
-            test["train"].shuffle().map(generate_and_tokenize_prompt, remove_columns=['instruction','input','output'])
+            dev["train"].shuffle().map(generate_and_tokenize_prompt)
         )
     else:
         train_data = train["train"].shuffle().map(generate_and_tokenize_prompt)
         val_data = None
-        test_data = test["train"].shuffle().map(generate_and_tokenize_prompt)
 
     if not ddp and torch.cuda.device_count() > 1:
         # keeps Trainer from trying its own DataParallelism when more than 1 gpu is available
