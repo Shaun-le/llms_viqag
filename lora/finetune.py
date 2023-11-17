@@ -63,7 +63,9 @@ def train(
         print(
             f"Training Alpaca-LoRA model with params:\n"
             f"base_model: {base_model}\n"
-            f"data_path: {data_path}\n"
+            f"trainset_path: {trainset_path}\n"
+            f"devset_path: {devset_path}\n"
+            f"testset_path: {testset_path}\n"
             f"output_dir: {output_dir}\n"
             f"batch_size: {batch_size}\n"
             f"micro_batch_size: {micro_batch_size}\n"
@@ -190,9 +192,9 @@ def train(
         dev = load_dataset("json", data_files=devset_path)
         test = load_dataset("json", data_files=testset_path)
     else:
-        train = load_dataset(data_path)
-        dev = load_dataset(data_path)
-        test = load_dataset(data_path)
+        train = load_dataset(trainset_path)
+        dev = load_dataset(devset_path)
+        test = load_dataset(testset_path)
 
     if resume_from_checkpoint:
         # Check the available weights and load them
