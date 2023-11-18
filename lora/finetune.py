@@ -188,9 +188,33 @@ def train(
     model = get_peft_model(model, config)
 
     if trainset_path.endswith(".json") or trainset_path.endswith(".jsonl"):
-        train = load_dataset("json", data_files=trainset_path)
+        '''train = load_dataset("json", data_files=trainset_path)
         dev = load_dataset("json", data_files=devset_path)
-        test = load_dataset("json", data_files=testset_path)
+        test = load_dataset("json", data_files=testset_path)'''
+
+        with open(trainset_path, 'r', encoding='utf-8') as f:
+            trainsets = json.load(f)
+
+        ins, inp, out = [], [], []
+        for i in tqdm(range(len(trainsets))):
+            ins.append(trainsets[i]['instruction'])
+            inp.append(trainsets[i]['input'])
+            out.append(trainsets[i]['output'])
+
+        dict_obj = {'instruction': ins, 'input': inp, 'output': out}
+        train = Dataset.from_dict(dict_obj)
+
+        with open(devset_path, 'r', encoding='utf-8') as f:
+            devsets = json.load(f)
+
+        ins, inp, out = [], [], []
+        for i in tqdm(range(len(devsets))):
+            ins.append(devsets[i]['instruction'])
+            inp.append(devsets[i]['input'])
+            out.append(devsets[i]['output'])
+
+        dict_obj = {'instruction': ins, 'input': inp, 'output': out}
+        dev = Dataset.from_dict(dict_obj)
     else:
         train = load_dataset(trainset_path)
         dev = load_dataset(devset_path)
@@ -219,11 +243,17 @@ def train(
     model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
 
     if val_set_size > 0:
-        train_data = (
+        '''train_data = (
             train["train"].shuffle().map(generate_and_tokenize_prompt)
         )
         val_data = (
             dev["train"].shuffle().map(generate_and_tokenize_prompt)
+        )'''
+        train_data = (
+            train.shuffle().map(generate_and_tokenize_prompt)
+        )
+        val_data = (
+            dev.shuffle().map(generate_and_tokenize_prompt)
         )
     else:
         train_data = train["train"].shuffle().map(generate_and_tokenize_prompt)
