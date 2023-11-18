@@ -5,8 +5,8 @@ import json
 import fire
 import torch
 import transformers
-from datasets import load_dataset
-
+from datasets import load_dataset, Dataset
+from tqdm import tqdm
 """
 Unused imports:
 import torch.nn as nn
