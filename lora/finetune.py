@@ -28,7 +28,9 @@ from utils.prompter import Prompter
 def train(
     # model/data params
     base_model: str = "",  # the only required argument
-    data_path: str = "yahma/alpaca-cleaned",
+    train_path: str = "yahma/alpaca-cleaned",
+    dev_path: str = "yahma/alpaca-cleaned",
+    test_path: str = "yahma/alpaca-cleaned",
     output_dir: str = "./lora-alpaca",
     # training hyperparams
     batch_size: int = 128,
@@ -61,7 +63,9 @@ def train(
         print(
             f"Training Alpaca-LoRA model with params:\n"
             f"base_model: {base_model}\n"
-            f"data_path: {data_path}\n"
+            f"train_path: {train_path}\n"
+            f"dev_path: {dev_path}\n"
+            f"test_path: {test_path}\n"
             f"output_dir: {output_dir}\n"
             f"batch_size: {batch_size}\n"
             f"micro_batch_size: {micro_batch_size}\n"
@@ -183,10 +187,12 @@ def train(
     )
     model = get_peft_model(model, config)
 
-    if data_path.endswith(".json") or data_path.endswith(".jsonl"):
-        data = load_dataset("json", data_files=data_path)
+    if train_path.endswith(".json") or train_path.endswith(".jsonl"):
+        train = load_dataset("json", data_files=train_path)
+        dev = load_dataset("json", data_files=dev_path)
     else:
-        data = load_dataset(data_path)
+        train = load_dataset(train_path)
+        dev = load_dataset(dev_path)
 
     if resume_from_checkpoint:
         # Check the available weights and load them
@@ -211,17 +217,14 @@ def train(
     model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
 
     if val_set_size > 0:
-        train_val = data["train"].train_test_split(
-            test_size=val_set_size, shuffle=True, seed=42
-        )
         train_data = (
-            train_val["train"].shuffle().map(generate_and_tokenize_prompt)
+            train["train"].shuffle().map(generate_and_tokenize_prompt)
         )
         val_data = (
-            train_val["test"].shuffle().map(generate_and_tokenize_prompt)
+            dev["train"].shuffle().map(generate_and_tokenize_prompt)
         )
     else:
-        train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
+        train_data = train["train"].shuffle().map(generate_and_tokenize_prompt)
         val_data = None
 
     if not ddp and torch.cuda.device_count() > 1:
