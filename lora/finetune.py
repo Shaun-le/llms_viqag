@@ -1,12 +1,12 @@
 import os
 import sys
 from typing import List
-import json
+
 import fire
 import torch
 import transformers
-from datasets import load_dataset, Dataset
-from tqdm import tqdm
+from datasets import load_dataset
+
 """
 Unused imports:
 import torch.nn as nn
@@ -27,10 +27,8 @@ from utils.prompter import Prompter
 
 def train(
     # model/data params
-    base_model: str = "",
-    trainset_path: str = "yahma/alpaca-cleaned",
-    devset_path: str = "yahma/alpaca-cleaned",
-    testset_path: str = "yahma/alpaca-cleaned",
+    base_model: str = "",  # the only required argument
+    data_path: str = "yahma/alpaca-cleaned",
     output_dir: str = "./lora-alpaca",
     # training hyperparams
     batch_size: int = 128,
@@ -63,9 +61,7 @@ def train(
         print(
             f"Training Alpaca-LoRA model with params:\n"
             f"base_model: {base_model}\n"
-            f"trainset_path: {trainset_path}\n"
-            f"devset_path: {devset_path}\n"
-            f"testset_path: {testset_path}\n"
+            f"data_path: {data_path}\n"
             f"output_dir: {output_dir}\n"
             f"batch_size: {batch_size}\n"
             f"micro_batch_size: {micro_batch_size}\n"
@@ -187,38 +183,10 @@ def train(
     )
     model = get_peft_model(model, config)
 
-    if trainset_path.endswith(".json") or trainset_path.endswith(".jsonl"):
-        train = load_dataset("json", data_files=trainset_path)
-        dev = load_dataset("json", data_files=devset_path)
-        test = load_dataset("json", data_files=testset_path)
-
-        '''with open(trainset_path, 'r', encoding='utf-8') as f:
-            trainsets = json.load(f)
-
-        ins, inp, out = [], [], []
-        for i in tqdm(range(len(trainsets))):
-            ins.append(trainsets[i]['instruction'])
-            inp.append(trainsets[i]['input'])
-            out.append(trainsets[i]['output'])
-
-        dict_obj = {'instruction': ins, 'input': inp, 'output': out}
-        train = Dataset.from_dict(dict_obj)
-
-        with open(devset_path, 'r', encoding='utf-8') as f:
-            devsets = json.load(f)
-
-        ins, inp, out = [], [], []
-        for i in tqdm(range(len(devsets))):
-            ins.append(devsets[i]['instruction'])
-            inp.append(devsets[i]['input'])
-            out.append(devsets[i]['output'])
-
-        dict_obj = {'instruction': ins, 'input': inp, 'output': out}
-        dev = Dataset.from_dict(dict_obj)'''
+    if data_path.endswith(".json") or data_path.endswith(".jsonl"):
+        data = load_dataset("json", data_files=data_path)
     else:
-        train = load_dataset(trainset_path)
-        dev = load_dataset(devset_path)
-        test = load_dataset(testset_path)
+        data = load_dataset(data_path)
 
     if resume_from_checkpoint:
         # Check the available weights and load them
@@ -243,20 +211,17 @@ def train(
     model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
 
     if val_set_size > 0:
+        train_val = data["train"].train_test_split(
+            test_size=val_set_size, shuffle=True, seed=42
+        )
         train_data = (
-            train["train"].shuffle().map(generate_and_tokenize_prompt)
+            train_val["train"].shuffle().map(generate_and_tokenize_prompt)
         )
         val_data = (
-            dev["train"].shuffle().map(generate_and_tokenize_prompt)
+            train_val["test"].shuffle().map(generate_and_tokenize_prompt)
         )
-        '''train_data = (
-            train.shuffle().map(generate_and_tokenize_prompt)
-        )
-        val_data = (
-            dev.shuffle().map(generate_and_tokenize_prompt)
-        )'''
     else:
-        train_data = train["train"].shuffle().map(generate_and_tokenize_prompt)
+        train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
         val_data = None
 
     if not ddp and torch.cuda.device_count() > 1:
@@ -307,7 +272,7 @@ def train(
 
     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
-    model.save_pretrained(output_dir, use_safetensors=False)
+    model.save_pretrained(output_dir)
 
     print(
         "\n If there's a warning about missing keys above, please disregard :)"
