@@ -50,7 +50,7 @@ def test(
 
     def generate_response(prompt: str, model: PeftModel) -> GreedySearchDecoderOnlyOutput:
         encoding = tokenizer(prompt, return_tensors="pt")
-        input_ids = encoding["input_ids"].to(DEVICE)
+        input_ids = encoding["input_ids"].to('cuda')
 
         generation_config = GenerationConfig(
             temperature=0.1,
