@@ -48,13 +48,13 @@ def test(
 
     def generate_and_tokenize_prompt(data_point):
         full_prompt = generate_prompt(data_point)
-        tokenized_full_prompt = tokenizer(full_prompt, truncation=True,padding=False,return_tensors=None)
+        tokenized_full_prompt = tokenizer(full_prompt, truncation=True, padding=True, return_tensors="pt")
         return tokenized_full_prompt
 
     def create_prompt(instruction: str, input: str) -> str:
         return PROMPT_TEMPLATE.replace("[INSTRUCTION]", instruction).replace("[INPUT]", input)
 
-    def generate_response(prompt: str, model: PeftModel) -> GreedySearchDecoderOnlyOutput:
+    '''def generate_response(prompt: str, model: PeftModel) -> GreedySearchDecoderOnlyOutput:
         encoding = tokenizer(prompt, return_tensors="pt")
         input_ids = encoding["input_ids"].to('cuda')
 
@@ -71,7 +71,7 @@ def test(
                 return_dict_in_generate=True,
                 output_scores=True,
                 max_new_tokens=256,
-            )
+            )'''
 
     test = load_dataset("json", data_files=test_path)
     test_data = (
@@ -82,7 +82,7 @@ def test(
         tokenizer, return_tensors="pt", padding=True
     )
 
-    dataloader = torch.utils.data.DataLoader(test_data, collate_fn=data_collator, batch_size=128)
+    dataloader = torch.utils.data.DataLoader(test_data, collate_fn=data_collator, batch_size=128, drop_last=True)
 
     generation_config = GenerationConfig(
         temperature=0.1,
@@ -111,7 +111,7 @@ def test(
     with open(os.path.join(check_point, 'results.json'), 'w', encoding='utf-8') as f:
         json.dump({'predictions': predictions}, f, ensure_ascii=False, indent=2)
 
-    def format_response(response: GreedySearchDecoderOnlyOutput) -> str:
+    '''def format_response(response: GreedySearchDecoderOnlyOutput) -> str:
         decoded_output = tokenizer.decode(response.sequences[0])
         # print(decoded_output)
         response = decoded_output.split("### Response:")[1].strip()
@@ -122,7 +122,7 @@ def test(
         response = generate_response(prompt, model)
         print(format_response(response))
 
-    print(ask_alpaca(inst,inp))
+    print(ask_alpaca(inst,inp))'''
 
 if __name__ == "__main__":
     fire.Fire(test)
