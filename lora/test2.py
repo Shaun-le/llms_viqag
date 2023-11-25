@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 def test(
         base_model: str = 'manhtt-079/llama-2-7b',
-        lora_weight: str = '/home/int2-user/llms_viqag/lora/weight',
+        lora_weight: str = '/home/int2-user/llms_viqag/lora/weight-vinewsqa',
         check_point: str = '',
         test_path: str = '',
 ):
@@ -42,7 +42,10 @@ def test(
         {data_point["instruction"]}
         
         ### Input:
-        {data_point["input"]}"""
+        {data_point["input"]}
+        
+        ### Response:
+        """
 
     CUTOFF_LEN = 1024
 
@@ -71,28 +74,6 @@ def test(
         tokenized_full_prompt = tokenize(full_prompt)
         return tokenized_full_prompt
 
-    '''def create_prompt(instruction: str, input: str) -> str:
-        return PROMPT_TEMPLATE.replace("[INSTRUCTION]", instruction).replace("[INPUT]", input)'''
-
-    '''def generate_response(prompt: str, model: PeftModel) -> GreedySearchDecoderOnlyOutput:
-        encoding = tokenizer(prompt, return_tensors="pt")
-        input_ids = encoding["input_ids"].to('cuda')
-
-        generation_config = GenerationConfig(
-            temperature=0.1,
-            top_p=0.75,
-            top_k=40,
-            num_beams=4
-        )
-        with torch.inference_mode():
-            return model.generate(
-                input_ids=input_ids,
-                generation_config=generation_config,
-                return_dict_in_generate=True,
-                output_scores=True,
-                max_new_tokens=256,
-            )'''
-
     test = load_dataset("json", data_files=test_path)
     test_data = (test["train"].shuffle().map(generate_and_tokenize_prompt, remove_columns=['instruction','input','output']))
 
@@ -108,6 +89,7 @@ def test(
         num_beams=4,
     )
 
+    dec = []
     predictions = []
 
     for _, batch in enumerate(tqdm(dataloader)):
@@ -123,23 +105,16 @@ def test(
             outputs = [tokenizer.decode(out, clean_up_tokenization_spaces=False, skip_special_tokens=True) for out in
                        outputs.sequences]
 
-        predictions.append(outputs.split("### Response:")[1].strip())
+        dec.append(outputs)
+
+    for i in range(len(dec)):
+        predictions.extend(dec[i][0].split("### Response:")[1].strip())
 
     with open(os.path.join(check_point, 'results.json'), 'w', encoding='utf-8') as f:
         json.dump({'predictions': predictions}, f, ensure_ascii=False, indent=2)
 
-    '''def format_response(response: GreedySearchDecoderOnlyOutput) -> str:
-        decoded_output = tokenizer.decode(response.sequences[0])
-        # print(decoded_output)
-        response = decoded_output.split("### Response:")[1].strip()
-        return "\n".join(textwrap.wrap(response))
 
-    def ask_alpaca(inst: str, inp: str, model: PeftModel = model) -> str:
-        prompt = create_prompt(inst, inp)
-        response = generate_response(prompt, model)
-        print(format_response(response))
-
-    print(ask_alpaca(inst,inp))'''
+    print(predictions[0])
 
 if __name__ == "__main__":
     fire.Fire(test)
