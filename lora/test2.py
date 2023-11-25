@@ -51,6 +51,9 @@ def test(
         tokenized_full_prompt = tokenizer(full_prompt, truncation=True,padding=False,return_tensors=None)
         return tokenized_full_prompt
 
+    def create_prompt(instruction: str, input: str) -> str:
+        return PROMPT_TEMPLATE.replace("[INSTRUCTION]", instruction).replace("[INPUT]", input)
+
     def generate_response(prompt: str, model: PeftModel) -> GreedySearchDecoderOnlyOutput:
         encoding = tokenizer(prompt, return_tensors="pt")
         input_ids = encoding["input_ids"].to('cuda')
