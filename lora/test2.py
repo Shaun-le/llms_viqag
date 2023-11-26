@@ -49,7 +49,7 @@ def test(
 
     CUTOFF_LEN = 1024
 
-    def tokenize(prompt, add_eos_token=True):
+    '''def tokenize(prompt, add_eos_token=True):
         result = tokenizer(
             prompt,
             truncation=True,
@@ -67,11 +67,11 @@ def test(
 
         result["labels"] = result["input_ids"].copy()
 
-        return result
+        return result'''
 
     def generate_and_tokenize_prompt(data_point):
         full_prompt = generate_prompt(data_point)
-        tokenized_full_prompt = tokenize(full_prompt)
+        tokenized_full_prompt = tokenizer(full_prompt)
         return tokenized_full_prompt
 
     test = load_dataset("json", data_files=test_path)
