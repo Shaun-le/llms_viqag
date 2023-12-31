@@ -1,4 +1,4 @@
-""" Evaluate Multitask QAG Model with QAG metric (eg. QA Aligned F1). """
+""" Evaluate Multitask QAG Model with QAG metric. """
 import json
 import logging
 import argparse

@@ -6,154 +6,11 @@ from collections import defaultdict
 from os.path import join as pj
 from typing import Dict, List
 import torch
-from .automatic_evaluation_tool.bleu.bleu import Bleu
-from .automatic_evaluation_tool.meteor.meteor import Meteor
-from .automatic_evaluation_tool.rouge import Rouge
-from .automatic_evaluation_tool.bertscore import BERTScore
-from .automatic_evaluation_tool.moverscore import MoverScore
-from .automatic_evaluation_tool.qa_aligned_f1_score import QAAlignedF1Score
 from .spacy_module import SpacyPipeline
 from .language_model import TransformersQG
 from .data import get_reference_files, get_dataset
 
 LANG_NEED_TOKENIZATION = ['ja', 'zh']
-
-
-def compute_metrics(out_file,
-                    tgt_file,
-                    src_file: str = None,
-                    prediction_aggregation: str = 'first',
-                    bleu_only: bool = False,
-                    language: str = 'en',
-                    skip: List = None,
-                    qag_model: bool = False):
-    """ compute automatic metric """
-    spacy_model = SpacyPipeline(language=language) if language in LANG_NEED_TOKENIZATION else None
-    pairs = []
-    pairs_raw = []
-    with open(tgt_file, "r") as infile:
-        for n, line in enumerate(infile):
-            if line.endswith('\n'):
-                line = line[:-1]
-            pairs_raw.append({'tokenized_question': line.strip(), 'tokenized_sentence': n})
-            if spacy_model is None:
-                pairs.append({'tokenized_question': line.strip(), 'tokenized_sentence': n})
-            else:
-                pairs.append({'tokenized_question': ' '.join(spacy_model.token(line.strip())), 'tokenized_sentence': n})
-
-    if src_file is not None and prediction_aggregation is not None:
-        # group by the source (sentence where the question are produced); this is used for grouping but not evaluation
-        with open(src_file, 'r') as infile:
-            for n, line in enumerate(infile):
-                if line.endswith('\n'):
-                    line = line[:-1]
-                pairs_raw[n]['tokenized_sentence'] = line.strip().lower()
-                if spacy_model is None:
-                    pairs[n]['tokenized_sentence'] = line.strip().lower()
-                else:
-                    pairs[n]['tokenized_sentence'] = ' '.join(spacy_model.token(line.strip().lower()))
-
-    # fix prediction's tokenization: lower-casing and detaching sp characters
-    with open(out_file, 'r') as infile:
-        for n, line in enumerate(infile):
-            if line.endswith('\n'):
-                line = line[:-1]
-            pairs_raw[n]['prediction'] = line.strip()
-            if spacy_model is None:
-                pairs[n]['prediction'] = line.strip()
-            else:
-                pairs[n]['prediction'] = ' '.join(spacy_model.token(line.strip()))
-
-    # eval
-    json.encoder.FLOAT_REPR = lambda o: format(o, '.4f')
-
-    def format_pair(_pairs):
-        res = defaultdict(lambda: [])
-        gts = defaultdict(lambda: [])
-
-        for pair in _pairs:
-
-            # key is the sentence where the model generates the question
-            key = pair['tokenized_sentence']
-
-            # one generation per sentence
-            if 'prediction' in pair:
-                pred = pair['prediction'].encode('utf-8')
-            else:
-                logging.warning('prediction not found at the evaluation')
-                pred = ''.encode('utf-8')
-            res[key].append(pred)
-
-            # multiple gold question per sentence
-            gts[key].append(pair['tokenized_question'].encode('utf-8'))
-
-        res_filtered = defaultdict(lambda: [])
-        for k, v in res.items():
-            # answer-level evaluation
-            if prediction_aggregation is None:
-                assert len(v) == 1
-                res_filtered[k] = v
-            elif prediction_aggregation == 'first':
-                # the first one
-                res_filtered[k] = [v[0]]
-            elif prediction_aggregation == 'last':
-                # the last one
-                res_filtered[k] = [v[-1]]
-            elif prediction_aggregation == 'long':
-                # the longest generation
-                res_filtered[k] = [v[v.index(sorted(v, key=len)[-1])]]
-            elif prediction_aggregation == 'short':
-                # the shortest generation
-                res_filtered[k] = [v[v.index(sorted(v, key=len)[0])]]
-            elif prediction_aggregation == 'middle':
-                # middle length generation
-                res_filtered[k] = [v[v.index(sorted(v, key=len)[int(len(v)/2)])]]
-            else:
-                raise ValueError(f'unknown aggregation method: {prediction_aggregation}')
-        return gts, res_filtered
-
-    output = {}
-    scorers = [(Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"])]
-    if not bleu_only:
-        scorers_extra = [
-            (Meteor(), "METEOR"),
-            (Rouge(), "ROUGE_L"),
-            (BERTScore(language=language), "BERTScore"),
-            (MoverScore(language=language), 'MoverScore')
-        ]
-        if qag_model:
-            scorers_extra += [
-                (QAAlignedF1Score(target_metric='f1', base_metric='bertscore', language=language),
-                 "QAAlignedF1Score (BERTScore)"),
-                (QAAlignedF1Score(target_metric='recall', base_metric='bertscore', language=language),
-                 "QAAlignedRecall (BERTScore)"),
-                (QAAlignedF1Score(target_metric='precision', base_metric='bertscore', language=language),
-                 "QAAlignedPrecision (BERTScore)"),
-                (QAAlignedF1Score(target_metric='f1', base_metric='moverscore', language=language),
-                 "QAAlignedF1Score (MoverScore)"),
-                (QAAlignedF1Score(target_metric='recall', base_metric='moverscore', language=language),
-                 "QAAlignedRecall (MoverScore)"),
-                (QAAlignedF1Score(target_metric='precision', base_metric='moverscore', language=language),
-                 "QAAlignedPrecision (MoverScore)")
-            ]
-        if skip is not None:
-            scorers_extra = [s for s in scorers_extra if s[1] not in skip]
-        scorers += scorers_extra
-    gts_, res_filtered_ = format_pair(pairs)
-    gts_raw, res_filtered_raw = format_pair(pairs_raw)
-    for scorer, method in scorers:
-        if type(method) is str and method.startswith('QAAligned'):
-            score, scores = scorer.compute_score(gts_raw, res_filtered_raw)
-        else:
-            score, scores = scorer.compute_score(gts_, res_filtered_)
-        torch.cuda.empty_cache()
-        if type(method) is not list:
-            score, scores, method = [score], [scores], [method]
-        for sc, scs, m in zip(score, scores, method):
-            logging.info(f"\t{m}: {sc}")
-            output[m] = sc
-    return output
-
 
 def evaluate(export_dir: str = '.',
              batch_size: int = 32,
@@ -261,34 +118,6 @@ def evaluate(export_dir: str = '.',
 
     assert hypothesis_file_dev is not None or hypothesis_file_test is not None,\
         f'model ({model}) or file path ({hypothesis_file_dev}, {hypothesis_file_test}) is needed'
-
-    def get_metric(split, hypothesis_file, skip_metrics):
-        assert prediction_level in ['sentence', 'paragraph', 'answer'], prediction_level
-        if prediction_level == 'answer':
-            src_file = None
-        else:
-            src_file = reference_files[f'{prediction_level}-{split}']
-
-        __metric = compute_metrics(
-            out_file=hypothesis_file,
-            tgt_file=reference_files[f'{output_type}-{split}'],
-            src_file=src_file,
-            prediction_aggregation=prediction_aggregation,
-            language=language,
-            bleu_only=bleu_only,
-            skip=skip_metrics,
-            qag_model=output_type == 'questions_answers'
-        )
-        return __metric
-
-    for _hypothesis_file, _split in zip([hypothesis_file_dev, hypothesis_file_test], [validation_split, test_split]):
-        if _hypothesis_file is None:
-            continue
-        if _split in metric:
-            _metric = get_metric(_split, _hypothesis_file, list(metric[_split].keys()))
-            metric[_split].update(_metric)
-        else:
-            metric[_split] = get_metric(_split, _hypothesis_file, None)
 
     with open(path_metric, 'w') as f:
         json.dump(metric, f)

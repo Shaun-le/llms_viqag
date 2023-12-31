@@ -8,7 +8,6 @@ from statistics import mean
 
 from datasets import load_dataset
 from lmqg import TransformersQG
-from lmqg.automatic_evaluation_tool import QAAlignedF1Score, Bleu, Meteor, Rouge, BERTScore, MoverScore
 from lmqg.spacy_module import SpacyPipeline
 from lmqg.automatic_evaluation import LANG_NEED_TOKENIZATION
 
@@ -47,25 +46,6 @@ def get_options():
 def main():
     opt = get_options()
     os.makedirs(opt.export_dir, exist_ok=True)
-    metrics = [
-        (QAAlignedF1Score(target_metric='f1', base_metric='bertscore', language=opt.language),
-         "QAAlignedF1Score (BERTScore)"),
-        (QAAlignedF1Score(target_metric='recall', base_metric='bertscore', language=opt.language),
-         "QAAlignedRecall (BERTScore)"),
-        (QAAlignedF1Score(target_metric='precision', base_metric='bertscore', language=opt.language),
-         "QAAlignedPrecision (BERTScore)"),
-        (QAAlignedF1Score(target_metric='f1', base_metric='moverscore', language=opt.language),
-         "QAAlignedF1Score (MoverScore)"),
-        (QAAlignedF1Score(target_metric='recall', base_metric='moverscore', language=opt.language),
-         "QAAlignedRecall (MoverScore)"),
-        (QAAlignedF1Score(target_metric='precision', base_metric='moverscore', language=opt.language),
-         "QAAlignedPrecision (MoverScore)"),
-        (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
-        (Meteor(), "METEOR"),
-        (Rouge(), "ROUGE_L"),
-        (BERTScore(language=opt.language), "BERTScore"),
-        (MoverScore(language=opt.language), 'MoverScore')
-    ]
 
     def load_model():
         if opt.model is not None:
@@ -167,18 +147,6 @@ def main():
             assert len(prediction) == len(model_input), f"{len(prediction)} != {len(model_input)}"
             with open(_file, 'w') as f:
                 f.write('\n'.join(prediction))
-
-        for metric, metric_name in metrics:
-            metric_name_list = [metric_name] if type(metric_name) is str else metric_name
-            if opt.overwrite_metric or any(m not in output[_split] for m in metric_name_list):
-                if spacy_model is not None and (type(metric_name) is list or not metric_name.startswith("QAAligned")):
-                    prediction = [' '.join(spacy_model.token(i)) for i in prediction]
-                scores = metric.get_score(prediction, gold_reference)
-                if type(metric_name) is list:
-                    for _metric_name, _score in zip(metric_name, scores):
-                        output[_split][_metric_name] = mean(_score.tolist())
-                else:
-                    output[_split][metric_name] = mean(scores.tolist())
 
     with open(metric_file, "w") as f:
         json.dump(output, f)

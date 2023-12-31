@@ -1,4 +1,3 @@
-""" T5 model. """
 import os
 import logging
 import pickle

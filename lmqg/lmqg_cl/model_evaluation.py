@@ -1,4 +1,3 @@
-""" SQuAD QG evaluation (sentence/answer level) """
 import logging
 import argparse
 import json
@@ -10,7 +9,7 @@ logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', level=logg
 
 
 def get_options():
-    parser = argparse.ArgumentParser(description='QG evaluation on SQuAD.')
+    parser = argparse.ArgumentParser(description='QG evaluation.')
     parser.add_argument('-m', '--model-checkpoint', default=None, type=str)
     parser.add_argument('--batch-size', default=16, type=int)
     parser.add_argument('--n-beams', default=4, type=int)
