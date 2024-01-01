@@ -69,7 +69,7 @@ class Trainer:
                  input_types: List or str = 'paragraph_answer',
                  output_types: List or str = 'question',
                  prefix_types: List or str = 'qg',
-                 model: str = 'vit5-base',
+                 model: str = 'VietAI/vit5-base',
                  max_length: int = 512,
                  max_length_output: int = 32,
                  epoch: int = 10,
